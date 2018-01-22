@@ -27,6 +27,7 @@ func (conn Conn) signHeader(req *http.Request, canonicalizedResource string) {
 	req.Header.Set(HTTPHeaderAuthorization, authorizationStr)
 }
 
+
 func (conn Conn) getSignedStr(req *http.Request, canonicalizedResource string) string {
 	// Find out the "x-oss-"'s address in this request'header
 	temp := make(map[string]string)
@@ -54,9 +55,15 @@ func (conn Conn) getSignedStr(req *http.Request, canonicalizedResource string) s
 	contentMd5 := req.Header.Get(HTTPHeaderContentMD5)
 
 	signStr := req.Method + "\n" + contentMd5 + "\n" + contentType + "\n" + date + "\n" + canonicalizedOSSHeaders + canonicalizedResource
-	h := hmac.New(func() hash.Hash { return sha1.New() }, []byte(conn.config.AccessKeySecret))
-	io.WriteString(h, signStr)
-	signedStr := base64.StdEncoding.EncodeToString(h.Sum(nil))
+	
+	signedStr := ""
+	if conn.Signer != nil {
+		signedStr = conn.Signer.Sign(req, signStr)
+	} else {
+		h := hmac.New(func() hash.Hash { return sha1.New() }, []byte(conn.config.AccessKeySecret))
+		io.WriteString(h, signStr)
+		signedStr = base64.StdEncoding.EncodeToString(h.Sum(nil))
+	}
 
 	return signedStr
 }

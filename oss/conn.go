@@ -19,11 +19,17 @@ import (
 	"time"
 )
 
+// Custom sign
+type Signer interface {
+	Sign (req *http.Request, signStr string) string
+}
+
 // Conn oss conn
 type Conn struct {
 	config *Config
 	url    *urlMaker
 	client *http.Client
+	Signer Signer
 }
 
 var signKeyList = []string{"acl", "uploads", "location", "cors", "logging", "website", "referer", "lifecycle", "delete", "append", "tagging", "objectMeta", "uploadId", "partNumber", "security-token", "position", "img", "style", "styleName", "replication", "replicationProgress", "replicationLocation", "cname", "bucketInfo", "comp", "qos", "live", "status", "vod", "startTime", "endTime", "symlink", "x-oss-process", "response-content-type", "response-content-language", "response-expires", "response-cache-control", "response-content-disposition", "response-content-encoding", "udf", "udfName", "udfImage", "udfId", "udfImageDesc", "udfApplication", "comp", "udfApplicationLog", "restore"}
@@ -211,6 +217,7 @@ func (conn Conn) doRequest(method string, uri *url.URL, canonicalizedResource st
 	req.Header.Set(HTTPHeaderDate, date)
 	req.Header.Set(HTTPHeaderHost, conn.config.Endpoint)
 	req.Header.Set(HTTPHeaderUserAgent, conn.config.UserAgent)
+
 	if conn.config.SecurityToken != "" {
 		req.Header.Set(HTTPHeaderOssSecurityToken, conn.config.SecurityToken)
 	}
@@ -220,13 +227,11 @@ func (conn Conn) doRequest(method string, uri *url.URL, canonicalizedResource st
 			req.Header.Set(k, v)
 		}
 	}
-
 	conn.signHeader(req, canonicalizedResource)
 
 	// transfer started
 	event := newProgressEvent(TransferStartedEvent, 0, req.ContentLength)
 	publishProgress(listener, event)
-
 	resp, err := conn.client.Do(req)
 	if err != nil {
 		// transfer failed
